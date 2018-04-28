@@ -1,155 +1,49 @@
-POP
-- Cross Overs don't make sense
-
-
-GA
+Basically Working (complete exhaustive tests sometime)
 
 NOTES:
 In reality haploid m/f join. Cross overs + muts occur in parent only!
 Adapted here so that cross overs occur between haploid parents.
 	
-	//The repro cycle
-	triple evolve() {
-		double pop_min_f = 0;   //sum, min
-		double f_unit = 0;      //converts fitness abv min -> children
-		bool not_same = calcFitness(pop_min_f, f_unit);
-		marry();
-		pop.gen++;
-		breed(pop_min_f, f_unit, not_same);
-		return couples[0];
-		//Swapped at end of breed... move into evolve?
-	}
 
-	//This decides on parameters that determine how many kids tou get
-	bool calcFitness(double& pop_min_f, double& f_unit) {//returns false if all same
-		//this is num children you get per couples fitness above min
-		//can be near zero so handle!
-	}
+===========================
+Documentation
+===========================
+genes held in single T[units] array.
+A second array collects children and they are swapped
 
+Fitness algo measures the population for 2 reasons:
+1/ produces 2 paramaters (pop_min_f, f_unit) to determine the number of kids each pair is due.
+2/ to list the population phenotypes.
 
-	//overload -> anything takes a pop and creates a list of couples
-	
-	void marry() {
-		//sort fitness<pop id, phenotype> by phenotype
-		std::sort(fitness, fitness + pop.pop_size, GA::paircmp);
-		int i2;
-		for (int i = 0; i<numcouples; i++)   //marry sorted neighbours
-		{
-			i2 = 2 * i;
-			couples[i].first = fitness[i2].first;
-			couples[i].second = fitness[i2 + 1].first;
-			couples[i].third = fitness[i2].second + fitness[i2 + 1].second;
-		}
-	}
+Marry. Mating strategies have been explored.
+Sorted fitness is used to chose pairs.
+>Top 2 marry, etc
+
+Breed performs the generation of next generation + irradiates it.
+
+Crossovers recorded in an ordered map.
+On replication of the population dna, switch parents according to the map.
+At crossover use 1/crossover map and 2/its complement to mix the parental bits
+State of parential switch changed according to bmask final bit of crossover mask
+Crossovers are rare, most of process is just copying the dna across.
+
+Irradiated (mutated) by evenly dropped along array
+
+Evolve is the highest level function.
+Uses the fitness measures and orchestrates a generation, increasing the pop generation count.
 
 
-	//Go thru pop and breed
-	void breed(double pop_min_f, double f_unit, bool not_same) {
-		//Get positions of all cross overs
-		pop.populateCrossOverMap();
+//////////////////////////////////////////////////////////////////////////////////
+// Dependency injection version
 
-		int child_count = 0;        //Num children so far
-		double total_children = 0;  //Total children to aim for
-		int num_children = 0;       //rounded Total children (don't round before else rounding artefacts)
-		for (int i = 0; i < numcouples; i++) {
-			int parent1 = couples[i].first;
-			int parent2 = couples[i].second;
-			double sum_fitness = couples[i].third;
-			double couple_f_abv_min = sum_fitness - 2 * pop_min_f;
-			//fitnesses too similar
-			if (not_same)
-				total_children += couple_f_abv_min * f_unit;
-			else
-				total_children += 2.0;
-			/*
-			add before rounding to avoid rounding artifacts
-			*/
-			num_children = floor(total_children);   //total_children -> popsize
-			while (child_count < (const int)num_children)
-			{
-				child(child_count++, parent1, parent2);
-			}
-		}
-		//Children made, swap populations around
-		pop.swapPopulations();
-		//irradiate the main population cause mutations
-		pop.irradiate();
-	}
+>Need to provide a code for the injected function to check deserialising into correct environment
+	i.e. which phenotype did this population get run against
+	ALSO serialisation is now not matching the setup!
 
-	inline T compl(T byte) {
-		return (T)~byte;
-	}
+>gene count is linked to phenotype so this should be in the injection
+	however this is deep as needed to define the population.
+
+>Population size, gene size (bits) (templated) = precision are actually environmental parameters.
+p.s. can we get gene_size from the T rather than code it manually.
 
 
-	//Make a new child!
-	void child(int ind, int parent1, int parent2) {
-
-		bool s = gsl_rng_uniform_int(pop.r, 2);                //random parent to start (false = parent1)
-		T comask;                           //for the mask
-		for (int g = 0; g<pop.gene_count; g++)   //go thru each gene position
-		{
-			if (!(comask = pop.get_mask_inc(ind, g)))
-			{
-				//0 = No crossover - i.e. mask {0,..,0}, or {1,..,1} i.e. just copy parent
-				pop.setChild(
-					ind,
-					g,
-					((s) ? pop.get(parent2, g) : pop.get(parent1, g))
-				);
-			}
-			else
-			{
-				T mask1, mask2;
-				if (s)
-				{
-					mask1 = comask;           //get mask orig. starting 0
-					mask2 = compl(comask);    //complement for parent2
-				}
-				else
-				{
-					mask1 = compl(comask);    //get mask orig. starting 1
-					mask2 = comask;
-				}
-#ifdef DEBUG
-				cout << "m1: " << prn(T, mask1) << endl;
-				cout << "m2: " << prn(T, mask2) << endl;
-#endif
-				//get parental genes
-				T g1 = pop.get(parent1, g);
-				T g2 = pop.get(parent2, g);
-#ifdef DEBUG
-
-				cout << "g1: " << prn(T, g1) << endl;
-				cout << "g2: " << prn(T, g2) << endl;
-#endif
-				//Apply cross over mask
-				g1 &= mask1;
-				g2 &= mask2;
-#ifdef DEBUG
-				cout << "apply masks" << endl;
-				cout << "g1: " << prn(T, g1) << endl;
-				cout << "g2: " << prn(T, g2) << endl;
-#endif
-				//OR combine into child
-				T child = g1 | g2;
-				//Save child
-#ifdef DEBUG
-				cout << "c: " << prn(T, child) << endl;
-#endif
-
-				//pop.setChild(ind, g, pop.get(parent1,g));
-				pop.setChild(ind, g, child);
-
-				//which parent uppermost after crossovers
-				//Look at last bit (should match start next mask)
-				//s = ((mask1 & pop.bmask[pop.sizeofT8-1]) == pop.bmask[pop.sizeofT8-1]);
-				s = (mask1 & 1);
-			}
-		}
-	}
-
-	virtual double phenotype(int ind) { 
-		T gene1 = pop.get(ind, 0);
-		return 1;
-	}
-};

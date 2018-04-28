@@ -30,7 +30,6 @@ struct GAException : public exception
 
 template<typename T> class GenePop {
 	//Population parameters
-	int gene_size;      //bits in gene: mask to limit mutations (almost obsolete, simply limits the max number size within T)
 	double prob_cross;
 	double prob_mut;
 	string archive_file;    //stores the serialised pop
@@ -54,10 +53,10 @@ template<typename T> class GenePop {
 	map<int, T> comap;  //map for filing gene cross overs
 	typename map<int, T>::iterator it_comap;
 
-	void init() {//once pop_size, gene_count, gene_size, prob_cross, prob_mut loaded then init
+	void init() {//once pop_size, gene_count, prob_cross, prob_mut loaded then init
 		sizeofT = sizeof(T);
 		sizeofT8 = sizeofT * 8;
-		initMem();
+			initMem();
 		//set dynamic masks for bit manipulation
 		//mask to extract bits
 		bmask = new T[sizeofT8+1];		//0000 0001,0000 0010,0000 0100,..,1000 0000,0000 0000 (i=T then = 0)
@@ -78,7 +77,7 @@ template<typename T> class GenePop {
 	void memParameters()
 	{
 		num_units = pop_size * gene_count;
-		population_bits = num_units * gene_size;
+		population_bits = num_units * sizeofT8;
 	}
 	void initMem()  //separated so can call separately when mem resized
 	{
@@ -103,7 +102,7 @@ template<typename T> class GenePop {
 	T getRandGene()
 	{
 		//Simply find a random number between 0 and 111...111 (size of T)
-		static unsigned long int geneinfosize = (unsigned long int)(mask[gene_size]);
+		static unsigned long int geneinfosize = (unsigned long int)(mask[sizeofT8]);
 		return gsl_rng_uniform_int(r, geneinfosize);  //limit size (bits)
 	}
 
@@ -111,13 +110,6 @@ template<typename T> class GenePop {
 		for (int i = 0; i<num_units; i++)
 			units[i] = getRandGene();
 	}
-
-	void set_all(T val) {       //byte by byte
-		for (int i = 0; i<num_units; i++)
-			units[i] = static_cast<T>(val);
-	}
-
-
 
 	/////////////////////////////////////
 
@@ -143,7 +135,7 @@ template<typename T> class GenePop {
 		fp >> gen;
 		fp >> pop_size;
 		fp >> gene_count;
-		fp >> gene_size;
+		fp >> sizeofT8;
 		fp >> prob_cross;
 		fp >> prob_mut;
 
@@ -203,8 +195,8 @@ public:
 	}
 
 	//Create new population
-	GenePop(int _pop_size = 10, int _gene_count = 1, int _gene_size = 8, double _prob_cross = 0.002, double _prob_mut = 0.00002, string af_ = "GA.pop", string ah_ = "") :
-		gen(0), pop_size(_pop_size), gene_count(_gene_count), gene_size(_gene_size), prob_cross(_prob_cross), prob_mut(_prob_mut), archive_file(af_), archive_hdr(ah_)
+	GenePop(int _pop_size = 10, int _gene_count = 1, double _prob_cross = 0.002, double _prob_mut = 0.00002, string af_ = "GA.pop", string ah_ = "") :
+		gen(0), pop_size(_pop_size), gene_count(_gene_count), prob_cross(_prob_cross), prob_mut(_prob_mut), archive_file(af_), archive_hdr(ah_)
 	{
 		init();
 		set_rand();
@@ -228,6 +220,12 @@ public:
 	void setArchiveFile(string af) { archive_file = af; }
 	void setArchiveHdr(string hdr) { archive_hdr = hdr; cout << "Header: " << archive_hdr << endl; }
 
+	//Set population to fixed value
+	void set_all(T val) {       //byte by byte
+		for (int i = 0; i<num_units; i++)
+			units[i] = static_cast<T>(val);
+	}
+
 	void setChild(int ind, int gene, int value) {
 		int offset = gene_pos(ind, gene);
 		units2[offset] = static_cast<T>(value);
@@ -248,7 +246,7 @@ public:
 		fp << gen << endl;
 		fp << pop_size << endl;
 		fp << gene_count << endl;
-		fp << gene_size << endl;
+		fp << sizeofT8 << endl;
 		fp << prob_cross << endl;
 		fp << prob_mut << endl;             //seems to add too many 0As
 
@@ -280,7 +278,7 @@ public:
 		{
 			//Get the gene and bit position of the next mutated bit
 			gene = gsl_rng_uniform_int(r, num_units);          //0 <= x < num_units
-			bit = gsl_rng_uniform_int(r, gene_size);           //This is the actual limit to number size not store!!!
+			bit = gsl_rng_uniform_int(r, sizeofT8);           //This is the actual limit to number size not store!!!
 															   //If T = bit then = 0
 			if (bmask[bit]) units[gene] ^= bmask[bit];
 		}
@@ -315,9 +313,9 @@ public:
 															 // != 0 since decided ther is a co here
 			
 			if (comap[gene] == 0) //new crossover in gene
-				comap[gene] = mask[1 + gsl_rng_uniform_int(r, gene_size - 1)];       //not 0 nor gene_size since must be a crossover! (note: mask[gene_size] -> all bits set)
+				comap[gene] = mask[1 + gsl_rng_uniform_int(r, sizeofT8 - 1)];       //not 0 nor gene_size since must be a crossover! (note: mask[gene_size] -> all bits set)
 			else
-				comap[gene] ^= mask[1 + gsl_rng_uniform_int(r, gene_size - 1)];       //not 0 nor gene_size since must be a crossover!
+				comap[gene] ^= mask[1 + gsl_rng_uniform_int(r, sizeofT8 - 1)];       //not 0 nor gene_size since must be a crossover!
 		}
 
 		//Init iterator for comaps
@@ -395,13 +393,13 @@ public:
 	void resizeGeneSize(int gs_)    //change number bits
 	{
 		//Mask data to new gene_size
-		if (gs_ < gene_size)
+		if (gs_ < sizeofT8)
 		{
-			gene_size = gs_;
+			sizeofT8 = gs_;
 			//Mask genes to new gene_size
 			for (int i = 0; i != num_units; ++i)
 			{
-				units[i] &= mask[gene_size];
+				units[i] &= mask[sizeofT8];
 			}
 		}
 		//Set population bits for irradiation
@@ -486,7 +484,7 @@ public:
 		str += "* Vers. " + string(_GP_VERSION_) + "                   *\n";
 		str += "*                                              *\n";
 		str += "************************************************\n\n";
-		str += "Pop size:\t" + to_string(pop_size) + "\nGene Count:\t" + to_string(gene_count) + "\nGene size\t" + to_string(gene_size) + "\nProb cross\t" + to_string(prob_cross) + "\nProb Mutate\t" + to_string(prob_mut) + "\n\n";
+		str += "Pop size:\t" + to_string(pop_size) + "\nGene Count:\t" + to_string(gene_count) + "\nGene size\t" + to_string(sizeofT8) + "\nProb cross\t" + to_string(prob_cross) + "\nProb Mutate\t" + to_string(prob_mut) + "\n\n";
 		return str;
 	}
 

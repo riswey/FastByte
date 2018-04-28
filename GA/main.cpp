@@ -3,32 +3,33 @@
 #include <cstdint>	//int16_t etc
 
 //Testing
-template<typename T> class TestGA : public GA<T> {
+
+template<typename T> class TestPhenotype: public Phenotype<T> {
 public:
-	TestGA(int popsize, int genecount, int genesize) : GA<T>(popsize, genecount, genesize) {}
-
-	double phenotype(int ind) { //individual
-		double val = (double)GA<T>::pop.get(ind, 0);
-
-		return 96.6 - pow(val/10 - 24.5, 2);
+	using Phenotype::Phenotype;
+	double calc(GenePop<T>& pop, int ind) {
+		double val = (double)pop.get(ind, 0);
+		return 96.6 - pow(val / 10 - 24.5, 2);
 	}
-
 };
-
-TestGA<uint16_t> a = TestGA<uint16_t >(10000, 1, 16);
 
 int main()
 {
+	//TODO: is passing pointer to object on the stack a bad idea?
+
+	TestPhenotype<uint16_t>* tp = new TestPhenotype<uint16_t>(1);
+	GA<uint16_t> a = GA<uint16_t>(tp, 10000);
 
 	triple top_pair = { 0, 0, 0.0 };
 
-	for (int i = 0; i<50000; i++) {
+	for (int i = 0; i<500000; i++) {
 		top_pair = a.evolve();
 		//std::cout << top_pair.first << "," << top_pair.second << "," << top_pair.third << "," << endl;
-		cout << a.phenotype(top_pair.first) << "(" << a.pop.get(top_pair.first,0) << ")" << endl;
+		cout << a.calc(top_pair.first) << "(" << a.get(top_pair.first,0) << ")" << endl;
 	}
 
-
+	delete tp;
+	
 
 	/*
 	GenePop<int16_t> g;

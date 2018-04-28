@@ -34,6 +34,21 @@ evolve	main loop
 
 using namespace std;
 
+template<typename T> class Phenotype {
+public:
+	int genecount;
+	int genesize;
+
+	Phenotype(int genecount) {
+		this->genecount = genecount;
+		this->genesize = sizeof(T) * 8;
+	}
+
+	virtual double calc(GenePop<T>& pop, int ind) {
+		return 1;
+	}
+};
+
 
 //Phenotype declaration
 //template<typename T> double phenotype(T* pop, int ind, int genecount);
@@ -50,29 +65,12 @@ struct triple {
 };
 
 template<typename T> class GA {
-public:
+	Phenotype<T>* phenotype;
+	GenePop<T> pop;
+
 	pair<int, double>* fitness; //collect individual fitnesses 1st 6Bytes fitness, 2nd 2B num
 	int numcouples;
 	triple* couples;            //marriage lists
-
-	static bool paircmp(pair<int, double> a, pair<int, double> b) {
-		return a.second > b.second;
-	}
-
-	GenePop<T> pop;
-
-	GA(string archive) : pop(archive) {
-		init();
-	}
-
-	GA(int popsize, int genecount, int genesize) : pop(popsize, genecount, genesize) {
-		init();
-	}
-
-	~GA() {
-		delete[] couples;
-		delete[] fitness;
-	}
 
 	void init() {//init rest of variables
 		cout << "************************************************" << endl;
@@ -85,24 +83,6 @@ public:
 		fitness = new pair<int, double>[pop.pop_size];
 		numcouples = static_cast<const int> (ceil(pop.pop_size / 2));
 		couples = new triple[numcouples];
-	}
-	//funcs control underlying population parameters
-	void setProbCO(double _prob_cross) { pop.setProbCO(_prob_cross); }
-	void setProbMut(double _prob_mut) { pop.setProbMut(_prob_mut); }
-	void setGeneSize(int gs_) { pop.setGeneSize(gs_); }
-	void setArchiveFile(string af_) { pop.setArchiveFile(af_); }
-	void setArchiveHdr(string hdr) { pop.setArchiveHdr(hdr); }
-	void resizePop(int newSize) { pop.resizePop(newSize); }
-
-	triple evolve() {
-		double pop_min_f = 0;   //sum, min
-		double f_unit = 0;      //converts fitness abv min -> children
-		bool not_same = calcFitness(pop_min_f, f_unit);
-		marry();
-		pop.gen++;
-		breed(pop_min_f, f_unit, not_same);
-		return couples[0];
-		//Swapped at end of breed... move into evolve?
 	}
 
 	void serialise() {
@@ -117,7 +97,7 @@ public:
 
 		for (int i = 0; i<pop.pop_size; i++)
 		{
-			f = phenotype(i);
+			f = phenotype->calc(pop, i);
 			fitness[i].first = i;   //id pop posn
 			fitness[i].second = f;
 			//calc pop fitness params
@@ -251,8 +231,50 @@ public:
 		}
 	}
 
-	virtual double phenotype(int ind) { 
-		T gene1 = pop.get(ind, 0);
-		return 1;
+public:
+
+	static bool paircmp(pair<int, double> a, pair<int, double> b) {
+		return a.second > b.second;
+	}
+
+	GA(string archive) : pop(archive) {
+		init();
+	}
+
+	GA(Phenotype<T>* phenotype, int popsize) : pop(popsize, phenotype->genecount) {
+		this->phenotype = phenotype;
+		init();
+	}
+
+	~GA() {
+		delete[] couples;
+		delete[] fitness;
+	}
+
+	//funcs control underlying population parameters
+	void setProbCO(double _prob_cross) { pop.setProbCO(_prob_cross); }
+	void setProbMut(double _prob_mut) { pop.setProbMut(_prob_mut); }
+	void setGeneSize(int gs_) { pop.setGeneSize(gs_); }
+	void setArchiveFile(string af_) { pop.setArchiveFile(af_); }
+	void setArchiveHdr(string hdr) { pop.setArchiveHdr(hdr); }
+	void resizePop(int newSize) { pop.resizePop(newSize); }
+
+	triple evolve() {
+		double pop_min_f = 0;   //sum, min
+		double f_unit = 0;      //converts fitness abv min -> children
+		bool not_same = calcFitness(pop_min_f, f_unit);
+		marry();
+		pop.gen++;
+		breed(pop_min_f, f_unit, not_same);
+		return couples[0];
+		//Swapped at end of breed... move into evolve?
+	}
+
+	double calc(int ind) { 
+		return phenotype->calc(pop, ind);
+	}
+
+	T get(int ind, int gene) {
+		return pop.get(ind, gene);
 	}
 };

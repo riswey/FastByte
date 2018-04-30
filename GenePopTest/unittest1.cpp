@@ -42,9 +42,7 @@ namespace GenePopTest
 			uint8_t gene3 = pop.get(0, 0);
 			a.IsTrue(gene3 == gene1);
 
-			pop.setArchiveFile("test.txt");
-				
-			pop.serialise();
+			pop.serialise("test.txt");
 
 		}
 

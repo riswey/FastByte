@@ -77,10 +77,6 @@ template<typename T> class GA {
 		couples = new triple[numcouples];
 	}
 
-	void serialise() {
-		pop.serialise();
-	}
-
 	bool calcFitness(double& pop_min_f, double& f_unit) {//returns false if all same
 		double sum = 0;
 		double mn = MAX_double;
@@ -248,9 +244,12 @@ public:
 	void setProbCO(double _prob_cross) { pop.setProbCO(_prob_cross); }
 	void setProbMut(double _prob_mut) { pop.setProbMut(_prob_mut); }
 	void setGeneSize(int gs_) { pop.setGeneSize(gs_); }
-	void setArchiveFile(string af_) { pop.setArchiveFile(af_); }
-	void setArchiveHdr(string hdr) { pop.setArchiveHdr(hdr); }
 	void resizePop(int newSize) { pop.resizePop(newSize); }
+
+	void serialise(string archive_name) {
+		string archive_header = phenotype->SIGNATURE;
+		pop.serialise(archive_name, archive_header);
+	}
 
 	triple evolve() {
 		double pop_min_f = 0;   //sum, min
@@ -269,5 +268,9 @@ public:
 
 	T get(int ind, int gene) {
 		return pop.get(ind, gene);
+	}
+
+	int gen() {
+		return pop.gen;
 	}
 };

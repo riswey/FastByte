@@ -32,9 +32,7 @@ template<typename T> class GenePop {
 	//Population parameters
 	double prob_cross;
 	double prob_mut;
-	string archive_file;    //stores the serialised pop
-	string archive_hdr;     //info about pop training (env files/stamps etc).
-							//derivative parameters
+
 	int num_units;      //num storage units (n)
 	int sizeofT;        //bytes in T
 	int sizeofT8;       //bits in T
@@ -113,7 +111,7 @@ template<typename T> class GenePop {
 
 	/////////////////////////////////////
 
-	void deserialiseInit() {
+	void deserialise(string archive_file) {
 		//relative to current directory
 		cout << "\n\nInitialising & Loading archive...\n";
 		cout << archive_file << "\n";
@@ -122,7 +120,9 @@ template<typename T> class GenePop {
 		if (!fp) {
 			throw GAException("Invalid file.");
 		}
+
 		//Environment files/ id stamps
+		//TODO: do we need to do anything with header
 		fp >> archive_hdr;
 		cout << "\nHeader : " << archive_hdr << endl;
 
@@ -189,14 +189,14 @@ public:
 	int gene_count;     //num genes per individual
 
 	//Init from archive
-	GenePop(string archive) :archive_file(archive) {
-		deserialiseInit();
+	GenePop(string archive) {
+		deserialise(archive_file);
 		pretties();
 	}
 
 	//Create new population
-	GenePop(int _pop_size = 10, int _gene_count = 1, double _prob_cross = 0.002, double _prob_mut = 0.00002, string af_ = "GA.pop", string ah_ = "") :
-		gen(0), pop_size(_pop_size), gene_count(_gene_count), prob_cross(_prob_cross), prob_mut(_prob_mut), archive_file(af_), archive_hdr(ah_)
+	GenePop(int _pop_size = 10, int _gene_count = 1, double _prob_cross = 0.002, double _prob_mut = 0.00002) :
+		gen(0), pop_size(_pop_size), gene_count(_gene_count), prob_cross(_prob_cross), prob_mut(_prob_mut)
 	{
 		init();
 		set_rand();
@@ -217,8 +217,6 @@ public:
 	//Set the population parameters
 	void setProbCO(double _prob_cross) { prob_cross = _prob_cross; cout << "Prob cross: " << prob_cross << endl; }
 	void setProbMut(double _prob_mut) { prob_mut = _prob_mut; cout << "Prob mut: " << prob_mut << endl; }
-	void setArchiveFile(string af) { archive_file = af; }
-	void setArchiveHdr(string hdr) { archive_hdr = hdr; cout << "Header: " << archive_hdr << endl; }
 
 	//Set population to fixed value
 	void set_all(T val) {       //byte by byte
@@ -237,10 +235,10 @@ public:
 		return static_cast<T>(units[offset]);
 	}
 
-	void serialise() {  //allow upto 8 bytes read in
+	void serialise(string archive_file, string archive_hdr = "") {  //allow upto 8 bytes read in
 						//relative to current directory
+
 		ofstream fp(archive_file.c_str(), ios::binary);
-		if (archive_hdr.length() == 0) archive_hdr = "(none)";   //ensure not empty so that >> can read back
 		fp << archive_hdr << endl;
 		fp << sizeofT << endl;
 		fp << gen << endl;

@@ -7,6 +7,8 @@
 template<typename T> class Phenotype {
 
 public:
+	string SIGNATURE = "BASE";
+
 	int genecount;
 	int genesize;
 

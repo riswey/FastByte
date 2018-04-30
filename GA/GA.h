@@ -1,8 +1,15 @@
 #pragma once
 
+/*
+	GA will maximise the phenotype function
+
+
+*/
+
 #define _GA_VERSION_ "2.1.2013.6.19.13.00"
 
 #include "GenePop.h"
+#include "Phenotype.h"
 #include <algorithm>//sort
 
 #define MAX_double 1e38
@@ -33,21 +40,6 @@ evolve	main loop
 */
 
 using namespace std;
-
-template<typename T> class Phenotype {
-public:
-	int genecount;
-	int genesize;
-
-	Phenotype(int genecount) {
-		this->genecount = genecount;
-		this->genesize = sizeof(T) * 8;
-	}
-
-	virtual double calc(GenePop<T>& pop, int ind) {
-		return 1;
-	}
-};
 
 
 //Phenotype declaration
@@ -171,7 +163,7 @@ template<typename T> class GA {
 	//Give birth
 	void child(int ind, int parent1, int parent2) {
 
-		bool s = gsl_rng_uniform_int(pop.r, 2);					//random parent to start (false = parent1)
+		bool s = gsl_rng_uniform_int(GenePop<T>::r, 2);					//random parent to start (false = parent1)
 		/*
 		cross-over mask
 		00011100 means bits from parent 0 or 1
@@ -244,6 +236,7 @@ public:
 	GA(Phenotype<T>* phenotype, int popsize) : pop(popsize, phenotype->genecount) {
 		this->phenotype = phenotype;
 		init();
+		cout << pop.pretties();
 	}
 
 	~GA() {

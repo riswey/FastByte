@@ -165,6 +165,7 @@
     <ClInclude Include="GA.h" />
     <ClInclude Include="extensions.h" />
     <ClInclude Include="GenePop.h" />
+    <ClInclude Include="Phenotype.h" />
   </ItemGroup>
   <ItemGroup>
     <Text Include="TODO.txt" />

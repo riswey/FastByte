@@ -29,6 +29,9 @@
     <ClInclude Include="extensions.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="Phenotype.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <Text Include="TODO.txt" />

@@ -4,8 +4,8 @@
 Holds population and encapsulates gene ops
 
 */
-
-#define _GP_VERSION_ "3.1.2013.10.17.18.30"    //serialise bug fixed
+#define _GP_VERSION_ "30.4.2018.0.0.0.1"		//resurrected. Removed bit resolution. Only evolves bytes now
+//#define _GP_VERSION_ "3.1.2013.10.17.18.30"   //serialise bug fixed
 
 #include <map>
 #include <time.h>   //to seed rand
@@ -70,7 +70,7 @@ template<typename T> class GenePop {
 		}
 
 		//Get ptr to random number generator
-		r = gsl_rng_alloc(gsl_rng_taus);
+		GenePop<T>::r = gsl_rng_alloc(gsl_rng_taus);
 		//seed generator
 		gsl_rng_set(r, time(NULL));
 	}
@@ -139,13 +139,18 @@ template<typename T> class GenePop {
 		fp >> prob_cross;
 		fp >> prob_mut;
 
+		if (sizeofT8 != sizeof(T) * 8) {
+			//TODO: actually this can just fit to new size with a warning
+			throw GAException("Failed to initialize. Popstore genesize doesn't fit object T size.")
+		}
+
 		init();         //initialise rest of class
 
 						//strip the final eol as binary read pointer moves to end of line?
 						//fp.ignore() dont use as wish to see which character is ignored
 		char eol;
 		fp.get(eol);
-		cout << "stripped: ASCII " << (int)eol << endl;
+		cout << "stripped: ASCII eol: " << (int)eol << ". Deserialising Binary...";
 
 		// deserialise binary file
 		char buffer[unitsize];
@@ -171,22 +176,17 @@ template<typename T> class GenePop {
 	///////////////////////////////////////////////////////////////////////////////////////////
 	///
 	///
-	///
-	///
 	///		PUBLIC
-	///
-	///
 	///
 	///
 	///////////////////////////////////////////////////////////////////////////////////////////
 
 public:
-	gsl_rng* r;         //ptr random number generator
+	static gsl_rng* r;         //ptr random number generator
 
 	int gen;            //generation
 	int pop_size;       //num individuals
 	int gene_count;     //num genes per individual
-
 
 	//Init from archive
 	GenePop(string archive) :archive_file(archive) {
@@ -497,3 +497,6 @@ public:
 		return str;
 	}
 };
+
+//Declaration of ptr to random number generator
+template<typename T> gsl_rng* GenePop<T>::r;

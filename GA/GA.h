@@ -11,6 +11,7 @@
 #include "GenePop.h"
 #include "Phenotype.h"
 #include <algorithm>//sort
+#include <vector>//moving individuals about
 
 #define MAX_double 1e38
 #define MIN_SUM_ABV_MIN 1e-10           //limit phenotype resolution so that rounding errors don't change pop size!
@@ -49,43 +50,53 @@ using namespace std;
 // Genetic Algorithm Class
 //////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-//use with couples
+//use with couples (16bytes)
 struct triple {
 	int first;      //parent1
 	int second;     //parent2
 	double third;   //combined fitness
 };
 
-template<typename T> class GA {
+template<typename T>
+class GA {
 	Phenotype<T>* phenotype;
 	GenePop<T> pop;
-
-	pair<int, double>* fitness; //collect individual fitnesses 1st 6Bytes fitness, 2nd 2B num
+	//12bytes
+	pair<int, double>* fitness; //collect individual fitnesses 1st 8Bytes fitness, 2nd 4B num
 	int numcouples;
 	triple* couples;            //marriage lists
 
 	void init() {//init rest of variables
+		double memMB = (pop.pop_size / 2 + 28 * pop.pop_size) / 1048576;
+
 		cout << "************************************************" << endl;
 		cout << "*                                              *" << endl;
 		cout << "* GENETIC ALGORITHM                            *" << endl;
 		cout << "* Vers. " << _GA_VERSION_ << "                    *" << endl;
 		cout << "*                                              *" << endl;
-		cout << "************************************************" << endl << endl;
+		cout << "************************************************" << endl;
+		cout << "Memory footprint: " << to_string(memMB) << "MB" << endl;
 
 		fitness = new pair<int, double>[pop.pop_size];
 		numcouples = static_cast<const int> (ceil(pop.pop_size / 2));
 		couples = new triple[numcouples];
 	}
 
-	bool calcFitness(double& pop_min_f, double& f_unit) {//returns false if all same
+	bool calcFitness(double& pop_min_f, double& f_unit) {	//
+		//returns false if all same
 		double sum = 0;
 		double mn = MAX_double;
 		double f;
 		double popsize = static_cast<double>(pop.pop_size);
 
-		for (int i = 0; i<pop.pop_size; i++)
+		for (int i = 0; i < pop.pop_size; i++)
 		{
+			////////////////////////////////////////////////////////
+			// fitness run here
 			f = phenotype->calc(pop, i);
+			//
+			////////////////////////////////////////////////////////
+
 			fitness[i].first = i;   //id pop posn
 			fitness[i].second = f;
 			//calc pop fitness params
@@ -107,11 +118,14 @@ template<typename T> class GA {
 		return true;
 	}
 
-	void marry() {
-		//sort fitness<pop id, phenotype> by phenotype
+	void sortFitness() {
 		std::sort(fitness, fitness + pop.pop_size, GA::paircmp);
+	}
+
+	void marry() {
+		//sort fitness first
 		int i2;
-		for (int i = 0; i<numcouples; i++)   //marry sorted neighbours
+		for (int i = 0; i<numcouples; i++)   //marry sorted neighbours 0...half, 1...half+1
 		{
 			i2 = 2 * i;
 			couples[i].first = fitness[i2].first;
@@ -139,84 +153,18 @@ template<typename T> class GA {
 				total_children += 2.0;
 			/*
 			add before rounding to avoid rounding artifacts
+			instead of looping num_children which would amplify the error.
 			*/
 			num_children = floor(total_children);   //total_children -> popsize
 			while (child_count < (const int)num_children)
 			{
-				child(child_count++, parent1, parent2);
+				pop.child(child_count++, parent1, parent2);
 			}
 		}
 		//Children made, swap populations around
 		pop.swapPopulations();
 		//irradiate the main population cause mutations
 		pop.irradiate();
-	}
-
-	inline T compl(T byte) {
-		return (T)~byte;
-	}
-
-	//Give birth
-	void child(int ind, int parent1, int parent2) {
-
-		bool s = gsl_rng_uniform_int(GenePop<T>::r, 2);					//random parent to start (false = parent1)
-		/*
-		cross-over mask
-		00011100 means bits from parent 0 or 1
-		then swapped by random parent swap
-
-		*/
-		T comask;
-		
-		for (int g = 0; g<pop.gene_count; g++)					//go thru each gene position
-		{
-			comask = pop.get_mask_inc(ind, g);
-
-			//TODO need to maintain state of last bit (flip s by end bit)
-			if (comask == 0)
-			{
-				//0 = No crossover i.e. just copy parent
-				pop.setChild(
-					ind,
-					g,
-					((s) ? pop.get(parent2, g) : pop.get(parent1, g))
-				);
-			}
-			else
-			{
-				T mask1, mask2;
-				if (s)
-				{
-					mask1 = comask;           //get mask orig. starting 0
-					mask2 = compl(comask);    //complement for parent2
-				}
-				else
-				{
-					mask1 = compl(comask);    //get mask orig. starting 1
-					mask2 = comask;
-				}
-
-				//get parental genes
-				T g1 = pop.get(parent1, g);
-				T g2 = pop.get(parent2, g);
-
-				//Apply cross over mask
-				g1 &= mask1;
-				g2 &= mask2;
-
-				//OR combine into child
-				T child = g1 | g2;
-				//Save child
-
-				//pop.setChild(ind, g, pop.get(parent1,g));
-				pop.setChild(ind, g, child);
-
-				//which parent uppermost after crossovers
-				//Look at last bit (should match start next mask)
-				//s = ((mask1 & pop.bmask[pop.sizeofT8-1]) == pop.bmask[pop.sizeofT8-1]);
-				s = (mask1 & 1);
-			}
-		}
 	}
 
 public:
@@ -229,8 +177,7 @@ public:
 		init();
 	}
 
-	GA(Phenotype<T>* phenotype, int popsize) : pop(popsize, phenotype->genecount) {
-		this->phenotype = phenotype;
+	GA(Phenotype<T>* phenotype, int popsize) : phenotype(phenotype), pop(popsize, phenotype->genecount) {
 		init();
 		cout << pop.pretties();
 	}
@@ -243,7 +190,6 @@ public:
 	//funcs control underlying population parameters
 	void setProbCO(double _prob_cross) { pop.setProbCO(_prob_cross); }
 	void setProbMut(double _prob_mut) { pop.setProbMut(_prob_mut); }
-	void setGeneSize(int gs_) { pop.setGeneSize(gs_); }
 	void resizePop(int newSize) { pop.resizePop(newSize); }
 
 	void serialise(string archive_name) {
@@ -254,10 +200,11 @@ public:
 	triple evolve() {
 		double pop_min_f = 0;   //sum, min
 		double f_unit = 0;      //converts fitness abv min -> children
-		bool not_same = calcFitness(pop_min_f, f_unit);
+		bool not_same = calcFitness(pop_min_f, f_unit);		//TODO: ignoring all same
+		sortFitness();
 		marry();
 		pop.gen++;
-		breed(pop_min_f, f_unit, not_same);
+		breed(pop_min_f, f_unit, not_same);		
 		return couples[0];
 		//Swapped at end of breed... move into evolve?
 	}
@@ -266,11 +213,31 @@ public:
 		return phenotype->calc(pop, ind);
 	}
 
-	T get(int ind, int gene) {
+	//TODO: check Casting big to avoid using T
+	int get(int ind, int gene) {
 		return pop.get(ind, gene);
 	}
 
 	int gen() {
 		return pop.gen;
 	}
+
+	int getGeneCount() {
+		return pop.gene_count;
+	}
+
+	enum POSITION {TOP,BOTTOM};
+
+	bool copyDNA(vector<T> dna, POSITION pos) {
+		if (pos == TOP) {
+			return pop.copyDNA(dna, 0);
+		}
+	}
+
+	void replaceDNA(vector<T> dna, POSITION pos) {
+		if (pos == BOTTOM) {
+			pop.replaceDNA(dna, pop.gene_count);
+		}
+	}
+
 };

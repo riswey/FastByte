@@ -4,7 +4,7 @@
 Holds population and encapsulates gene ops
 
 */
-#define _GP_VERSION_ "30.4.2018.0.0.0.1"		//resurrected. Removed bit resolution. Only evolves bytes now
+#define _GP_VERSION_ "30.4.2018.0.0.0.1   "		//resurrected. Removed bit resolution. Only evolves bytes now
 //#define _GP_VERSION_ "3.1.2013.10.17.18.30"   //serialise bug fixed
 
 #include <map>
@@ -13,6 +13,8 @@ Holds population and encapsulates gene ops
 #include "gsl/gsl_randist.h"
 //#include "gsl/gsl_cdf.h"
 #include "myfilefuncs.h"
+
+#include <vector>
 
 using namespace std;
 
@@ -54,7 +56,7 @@ template<typename T> class GenePop {
 	void init() {//once pop_size, gene_count, prob_cross, prob_mut loaded then init
 		sizeofT = sizeof(T);
 		sizeofT8 = sizeofT * 8;
-			initMem();
+		initMem();
 		//set dynamic masks for bit manipulation
 		//mask to extract bits
 		bmask = new T[sizeofT8+1];		//0000 0001,0000 0010,0000 0100,..,1000 0000,0000 0000 (i=T then = 0)
@@ -290,6 +292,23 @@ public:
 	}
 
 	///////////////////////////////////
+	// DISPERSAL
+	///////////////////////////////////
+
+	//Copy onto heap. Delete manually.
+	bool copyDNA(vector<T> dna, int ind) {
+		int offset = gene_pos(ind, 0);
+		dna.insert(dna.begin(), units + offset, units + offset + gene_count);
+		return true;
+	}
+
+	void replaceDNA(vector<T> dna, int ind) {
+		int offset = gene_pos(ind, 0);
+		std::copy(dna.begin(), dna.end(), units + offset);
+	}
+
+
+	///////////////////////////////////
 	// CROSS_OVERS
 	///////////////////////////////////
 
@@ -342,6 +361,78 @@ public:
 	{
 		it_comap = comap.begin();
 	}
+
+	///////////////////////////////////////////////////////////////////////////////////////////////
+	// Combine Parents into a child
+	///////////////////////////////////////////////////////////////////////////////////////////////
+
+	inline static T compl(T byte) {
+		return (T)~byte;
+	}
+
+	//Give birth
+	void child(int ind, int parent1, int parent2) {
+
+		bool s = gsl_rng_uniform_int(r, 2);					//random parent to start (false = parent1)
+																		/*
+																		cross-over mask
+																		00011100 means bits from parent 0 or 1
+																		then swapped by random parent swap
+
+																		*/
+		T comask;
+
+		for (int g = 0; g<gene_count; g++)					//go thru each gene position
+		{
+			comask = get_mask_inc(ind, g);
+
+			//TODO need to maintain state of last bit (flip s by end bit)
+			if (comask == 0)
+			{
+				//0 = No crossover i.e. just copy parent
+				setChild(
+					ind,
+					g,
+					((s) ? get(parent2, g) : get(parent1, g))
+				);
+			}
+			else
+			{
+				T mask1, mask2;
+				if (s)
+				{
+					mask1 = comask;           //get mask orig. starting 0
+					mask2 = compl(comask);    //complement for parent2
+				}
+				else
+				{
+					mask1 = compl(comask);    //get mask orig. starting 1
+					mask2 = comask;
+				}
+
+				//get parental genes
+				T g1 = get(parent1, g);
+				T g2 = get(parent2, g);
+
+				//Apply cross over mask
+				g1 &= mask1;
+				g2 &= mask2;
+
+				//OR combine into child
+				T child = g1 | g2;
+				//Save child
+
+				//pop.setChild(ind, g, pop.get(parent1,g));
+				setChild(ind, g, child);
+
+				//which parent uppermost after crossovers
+				//Look at last bit (should match start next mask)
+				//s = ((mask1 & pop.bmask[pop.sizeofT8-1]) == pop.bmask[pop.sizeofT8-1]);
+				s = (mask1 & 1);
+			}
+		}
+	}
+
 
 	///////////////////////////////////////////////////////////////////////////////////////////////
 	// Resize Model
@@ -475,6 +566,8 @@ public:
 
 	string pretties()
 	{
+		double memGB = (double)(pop_size * gene_count * sizeofT) / 1073741824.0 * 2;
+
 		string str = "";
 		str += "************************************************\n";
 		str += "*                                              *\n";
@@ -482,7 +575,8 @@ public:
 		str += "* Vers. " + string(_GP_VERSION_) + "                   *\n";
 		str += "*                                              *\n";
 		str += "************************************************\n\n";
-		str += "Pop size:\t" + to_string(pop_size) + "\nGene Count:\t" + to_string(gene_count) + "\nGene size\t" + to_string(sizeofT8) + "\nProb cross\t" + to_string(prob_cross) + "\nProb Mutate\t" + to_string(prob_mut) + "\n\n";
+		str += "Pop size:\t" + to_string(pop_size) + "\nGene Count:\t" + to_string(gene_count) + "\nGene size\t" + to_string(sizeofT8) + "\nProb cross\t" + to_string(prob_cross) + "\nProb Mutate\t" + to_string(prob_mut) + "\n";
+		str += "Model footprint: " + to_string(memGB) + "GB\n";
 		return str;
 	}
 

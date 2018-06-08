@@ -7,7 +7,7 @@
 template<typename T> class TestPhenotype: public Phenotype<T> {
 public:
 	using Phenotype::Phenotype;
-	double calc(GenePop<T>& pop, int ind) {
+	double calc(GenePop<T>& const pop, const int ind) {
 		double val = (double)pop.get(ind, 0);
 
 		return 96.6 - pow(val / 10 - 24.5, 2);
@@ -18,10 +18,10 @@ int main()
 {
 	//TODO: is passing pointer to object on the stack a bad idea?
 
-	TestPhenotype<uint16_t>* tp = new TestPhenotype<uint16_t>(1);
-	GA<uint16_t> a = GA<uint16_t>(tp, 10000);
-	a.setProbCO(0.0001);
-	a.setProbMut(0.00001);
+	auto *tp = new TestPhenotype<uint16_t>(1);
+	auto a = GA<uint16_t, TestPhenotype<uint16_t>>(tp, 1000000);
+	a.setProbCO(0.001);
+	a.setProbMut(0.0001);
 
 	//GA<uint16_t> a = GA<uint16_t>(tp, "test.pop");
 

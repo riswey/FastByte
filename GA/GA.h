@@ -14,6 +14,14 @@
 #include "Phenotype.h"
 #include <algorithm>//sort
 #include <vector>//moving individuals about
+#include "ctpl_stl.h"
+#include <mutex>		//consider critical section = faster
+#include "windows.h"	//for HANDLE
+#include <process.h>	//for event
+
+//only temp while debugging
+#include <iostream>
+
 
 #define MAX_double 1e38
 #define MIN_SUM_ABV_MIN 1e-10           //limit phenotype resolution so that rounding errors don't change pop size!
@@ -44,9 +52,16 @@ evolve	main loop
 
 using namespace std;
 
-
 //Phenotype declaration
 //template<typename T> double phenotype(T* pop, int ind, int genecount);
+
+//Multithreading
+int NUMBER_PROCESSORS = 4;
+ctpl::thread_pool p(NUMBER_PROCESSORS);
+std::mutex mtx;
+static std::atomic<int> threadReturnCount = 0;		//try semaphore
+static int processTarget = 0;
+HANDLE myEvent = CreateEvent(0, 0, 0, 0);		//win32 API
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Genetic Algorithm Class
@@ -59,9 +74,48 @@ struct triple {
 	double third;   //combined fitness
 };
 
-template<typename T>
+; //collect individual fitnesses 1st 8Bytes fitness, 2nd 4B num
+
+
+//Must be pointers as copied by value across (References do not work in threads)
+template<typename T, typename U> void threadSafeFitness(int id, GenePop<T>* pop, U* phenotype, pair<int, double>* fitness, int i, double* sum, double* mn, double* pop_min_f) {
+	
+	////////////////////////////////////////////////////////
+	// fitness run here
+	double f = phenotype->calc(*pop, i);
+	//
+	////////////////////////////////////////////////////////
+
+	//Important to lock these are not atomic variables)
+	mtx.lock();
+
+	fitness[i].first = i;   //id pop posn
+	fitness[i].second = f;
+	//calc pop fitness params
+	*sum += f;                   //sum
+	if (f < *mn)                 //min
+	{
+		*mn = f;
+		*pop_min_f = f;
+	}
+	mtx.unlock();
+
+	//Is it the last thread to return -> call
+	//atomic so ok
+	++threadReturnCount;
+
+	if (threadReturnCount == processTarget) {
+		threadReturnCount = 0;
+		SetEvent(myEvent);
+	}
+}
+
+
+
+
+template<typename T, typename U>
 class GA {
-	Phenotype<T>* phenotype;
+	U* phenotype;
 	GenePop<T> pop;
 	//12bytes
 	pair<int, double>* fitness; //collect individual fitnesses 1st 8Bytes fitness, 2nd 4B num
@@ -88,27 +142,21 @@ class GA {
 		//returns false if all same
 		double sum = 0;
 		double mn = MAX_double;
-		double f;
 		double popsize = static_cast<double>(pop.pop_size);
+
+		//Use Semaphore?
+		processTarget = pop.pop_size;
 
 		for (int i = 0; i < pop.pop_size; i++)
 		{
-			////////////////////////////////////////////////////////
-			// fitness run here
-			f = phenotype->calc(pop, i);
-			//
-			////////////////////////////////////////////////////////
-
-			fitness[i].first = i;   //id pop posn
-			fitness[i].second = f;
-			//calc pop fitness params
-			sum += f;                   //sum
-			if (f < mn)                 //min
-			{
-				mn = f;
-				pop_min_f = f;
-			}
+			//pop in on stack so send point, next 2 are pointers already.
+			p.push(threadSafeFitness<T, U>, &pop, phenotype, fitness, i, &sum, &mn, &pop_min_f);
 		}
+
+		//hopefully main thread waits until event set
+		
+		WaitForSingleObject(myEvent, INFINITE);
+
 		//this is num children you get per couples fitness above min
 		//can be near zero so handle!
 		double denom = (sum - popsize * pop_min_f);
@@ -177,7 +225,7 @@ public:
 
 	GA(): phenotype(nullptr), pop(0, 0) {init();}
 
-	GA(Phenotype<T>* phenotype, string archive) : phenotype(phenotype), pop(archive) {
+	GA(U* phenotype, string archive) : phenotype(phenotype), pop(archive) {
 		//TODO: if pop header != phenotype.SIGNATURE
 		//string archive_header = phenotype->SIGNATURE;
 		//pop.serialise(archive_name, archive_header);
@@ -188,13 +236,14 @@ public:
 		cout << pop.pretties();
 	}
 
-	GA(Phenotype<T>* phenotype, int popsize) : phenotype(phenotype), pop(popsize, phenotype->genecount) {
+	GA(U* phenotype, int popsize) : phenotype(phenotype), pop(popsize, phenotype->genecount) {
 		cout << "GA: Main Construct Pop" << endl;
 		init();
 		cout << pop.pretties();
 	}
 
 	~GA() {
+		CloseHandle(myEvent);
 		delete[] couples;
 		delete[] fitness;
 	}
@@ -256,9 +305,9 @@ public:
 #ifdef VERBOSE
 		cout << "Breed.";
 #endif // VERBOSE
-		breed(pop_min_f, f_unit, not_same);		
+		breed(pop_min_f, f_unit, not_same);
 		return couples[0];			//returns fitness of top parents
-		//Swapped at end of breed... move into evolve?
+									//Swapped at end of breed... move into evolve?
 	}
 
 	double calc(int ind) { 

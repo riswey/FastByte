@@ -271,7 +271,7 @@ public:
 	}
 
 	//Return a gene
-	T get(int ind, int gene) {
+	T get(const int ind, const int gene) {
 		int offset = gene_pos(ind, gene);
 		return static_cast<T>(units[offset]);
 	}

@@ -39,16 +39,15 @@ template<typename T> class GenePop {
 	int sizeofT;        //bytes in T
 	int sizeofT8;       //bits in T
 	int population_bits;       //Total bits for global functions
-	float RANDEXPDISTSCALE;         //multiple for randExpDist
-	float RANDEXPDISTCORRECTION;    //corrects distribution to unit probability
 	T* units;           //the mem
 	T* units2;          //mem for children
+	//Make static! (only need define once)
 	T* bmask;           //2^x ( to get bit 0,1,2,3: & with bmask[0,1,2,3] ) :bmask[5] = 100000 : used (i=0;i++<sizeof(T);)
 	T* mask;            //2^x - 1 ( to limit to x bits)                     :mask[5] = 11111 : used to mask sizeof(T)
 	/*
-		CROSS-OVERS
-		
 	
+		CROSS-OVERS
+
 	*/
 	map<int, T> comap;  //map for filing gene cross overs
 	typename map<int, T>::iterator it_comap;
@@ -70,14 +69,9 @@ template<typename T> class GenePop {
 		}
 
 		//Get ptr to random number generator
-		GenePop<T>::r = gsl_rng_alloc(gsl_rng_taus);
-		//seed generator
+		//GenePop<T>::r = gsl_rng_alloc(gsl_rng_taus);
+		//seed generator (doesn't matter if different objects reseed it)
 		gsl_rng_set(r, time(NULL));
-	}
-	void memParameters()
-	{
-		num_units = pop_size * gene_count;
-		population_bits = num_units * sizeofT8;
 	}
 	void initMem()  //separated so can call separately when mem resized
 	{
@@ -85,6 +79,11 @@ template<typename T> class GenePop {
 		//Create units
 		units = new T[num_units];           //create memory
 		units2 = new T[num_units];           //create child memory
+	}
+	void memParameters()
+	{
+		num_units = pop_size * gene_count;
+		population_bits = num_units * sizeofT8;
 	}
 
 	T* delete_old_mem()
@@ -115,8 +114,7 @@ template<typename T> class GenePop {
 
 	void deserialise(string archive_file) {
 		//relative to current directory
-		cout << "\n\nInitialising & Loading archive...\n";
-		cout << archive_file << "\n";
+		cout << "\n\nInitialising & Loading archive: " << archive_file << "\n";
 
 		ifstream fp(archive_file.c_str(), ios::binary);
 		if (!fp) {
@@ -125,6 +123,7 @@ template<typename T> class GenePop {
 
 		//Environment files/ id stamps
 		//TODO: do we need to do anything with header
+		string archive_hdr;
 		fp >> archive_hdr;
 		cout << "\nHeader : " << archive_hdr << endl;
 
@@ -132,7 +131,7 @@ template<typename T> class GenePop {
 		fp >> unitsize;
 		if (sizeof(T) < unitsize)
 		{
-			throw GAException("Non matching unitsizes! " + patch::to_string(sizeofT) + "!=" + patch::to_string(unitsize));
+			throw GAException("Non matching unitsizes! " + to_string(sizeofT) + "!=" + to_string(unitsize));
 		}
 		fp >> gen;
 		fp >> pop_size;
@@ -143,7 +142,7 @@ template<typename T> class GenePop {
 
 		if (sizeofT8 != sizeof(T) * 8) {
 			//TODO: actually this can just fit to new size with a warning
-			throw GAException("Failed to initialize. Popstore genesize doesn't fit object T size.")
+			throw GAException("Failed to initialize. Popstore genesize doesn't fit object T size.");
 		}
 
 		init();         //initialise rest of class
@@ -155,11 +154,12 @@ template<typename T> class GenePop {
 		cout << "stripped: ASCII eol: " << (int)eol << ". Deserialising Binary...";
 
 		// deserialise binary file
-		char buffer[unitsize];
+		char* buffer = new char[sizeofT];
 		for (int i = 0; i<num_units; i++) {
-			fp.read(buffer, unitsize);
+			fp.read(buffer, sizeofT);
 			units[i] = *((T*)buffer);
 		}
+		delete[] buffer;
 
 		fp.close();
 		cout << "done.\n\n";
@@ -191,7 +191,7 @@ public:
 	int gene_count;     //num genes per individual
 
 	//Init from archive
-	GenePop(string archive) {
+	GenePop(string archive_file) {
 		deserialise(archive_file);
 		pretties();
 	}
@@ -206,14 +206,53 @@ public:
 	}
 
 	~GenePop() {
-		//Release resources used by random number generator
-		gsl_rng_free(r);
 		//Clear memory
 		delete[] units;
 		delete[] units2;
 		delete[] bmask;
 		delete[] mask;
 		cout << "Memory freed." << endl;
+	}
+
+	GenePop(const GenePop& pop):
+		prob_cross(pop.prob_cross),
+		prob_mut(pop.prob_mut),
+		sizeofT(pop.sizeofT),
+		sizeofT8(pop.sizeofT8),
+		gen(pop.gen),
+		pop_size(pop.pop_size),
+		gene_count(pop.gene_count),
+		num_units(pop.num_units),
+		population_bits(pop.population_bits),
+		units(new T[pop.num_units]),
+		units2(new T[pop.num_units]),
+		bmask(new T[pop.sizeofT8 + 1]),
+		mask(new T[pop.sizeofT8 + 1])
+	{
+		memcpy(units, pop.units, pop.num_units * pop.sizeofT);
+		memcpy(units2, pop.units2, pop.num_units * pop.sizeofT);
+		memcpy(bmask, pop.bmask, pop.sizeofT8 + 1);
+		memcpy(mask, pop.mask, pop.sizeofT8 + 1);
+		cout << "GenePop: Deep Copy" << endl;
+	}
+
+	GenePop& operator=(GenePop other) {	//already copied
+		cout << "GenePop: Assignment!" << endl;
+		swap(*this, other);
+		return *this;
+	}
+
+	void swap(GenePop& gp1, GenePop& gp2) {
+		std::swap(gp1.prob_cross, gp2.prob_cross);
+		std::swap(gp1.prob_mut, gp2.prob_mut);
+		std::swap(gp1.gen, gp2.gen);
+		std::swap(gp1.pop_size, gp2.pop_size);
+		std::swap(gp1.gene_count, gp2.gene_count);
+		std::swap(gp1.num_units, gp2.num_units);
+		std::swap(gp1.population_bits, gp2.population_bits);
+		std::swap(gp1.units, gp2.units);
+		std::swap(gp1.units2, gp2.units2);
+		//rest are same!
 	}
 
 	//Set the population parameters
@@ -591,4 +630,4 @@ public:
 };
 
 //Declaration of ptr to random number generator
-template<typename T> gsl_rng* GenePop<T>::r;
+template<typename T> gsl_rng* GenePop<T>::r = gsl_rng_alloc(gsl_rng_taus);

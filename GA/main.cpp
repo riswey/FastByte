@@ -9,6 +9,7 @@ public:
 	using Phenotype::Phenotype;
 	double calc(GenePop<T>& pop, int ind) {
 		double val = (double)pop.get(ind, 0);
+
 		return 96.6 - pow(val / 10 - 24.5, 2);
 	}
 };
@@ -19,14 +20,20 @@ int main()
 
 	TestPhenotype<uint16_t>* tp = new TestPhenotype<uint16_t>(1);
 	GA<uint16_t> a = GA<uint16_t>(tp, 10000);
+	a.setProbCO(0.0001);
+	a.setProbMut(0.00001);
+
+	//GA<uint16_t> a = GA<uint16_t>(tp, "test.pop");
 
 	triple top_pair = { 0, 0, 0.0 };
 
-	for (int i = 0; i<500000; i++) {
+	for (int i = 0; i<300; i++) {
 		top_pair = a.evolve();
 		//std::cout << top_pair.first << "," << top_pair.second << "," << top_pair.third << "," << endl;
-		cout << a.calc(top_pair.first) << "(" << a.get(top_pair.first,0) << ")" << endl;
+		cout << a.gen() << "\t" << a.calc(top_pair.first) << "(" << a.get(top_pair.first,0) << ")" << endl;
 	}
+
+	//a.serialise("test.pop");
 
 	delete tp;
 	

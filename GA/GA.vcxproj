@@ -79,7 +79,7 @@
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <LinkIncremental>true</LinkIncremental>
     <IncludePath>C:\Users\Alva\source\repos\Libs\msvc2017_64\include;C:\Users\Alva\source\repos\MyFileFuncs\MyFileFuncs;$(IncludePath)</IncludePath>
-    <LibraryPath>C:\Users\Alva\source\repos\Libs\msvc2017_64\lib\gsl;C:\Users\Alva\source\repos\MyFileFuncs\x64\Release;$(LibraryPath)</LibraryPath>
+    <LibraryPath>C:\Users\Alva\source\repos\Libs\msvc2017_64\lib\gsl;C:\Users\Alva\source\repos\MyFileFuncs\x64\Debug;$(LibraryPath)</LibraryPath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
     <LinkIncremental>false</LinkIncremental>
@@ -162,6 +162,7 @@
     <ClCompile Include="main.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="ctpl_stl.h" />
     <ClInclude Include="GA.h" />
     <ClInclude Include="extensions.h" />
     <ClInclude Include="GenePop.h" />

@@ -8,6 +8,8 @@
 
 #define _GA_VERSION_ "2.1.2013.6.19.13.00"
 
+//#define VERBOSE
+
 #include "GenePop.h"
 #include "Phenotype.h"
 #include <algorithm>//sort
@@ -173,11 +175,21 @@ public:
 		return a.second > b.second;
 	}
 
-	GA(string archive) : pop(archive) {
+	GA(): phenotype(nullptr), pop(0, 0) {init();}
+
+	GA(Phenotype<T>* phenotype, string archive) : phenotype(phenotype), pop(archive) {
+		//TODO: if pop header != phenotype.SIGNATURE
+		//string archive_header = phenotype->SIGNATURE;
+		//pop.serialise(archive_name, archive_header);
+		//func createHeader() -> somethink like "sig: phenotype.SIGNATURE"
+		//then get header from pop and check it with createHeader()
+
 		init();
+		cout << pop.pretties();
 	}
 
 	GA(Phenotype<T>* phenotype, int popsize) : phenotype(phenotype), pop(popsize, phenotype->genecount) {
+		cout << "GA: Main Construct Pop" << endl;
 		init();
 		cout << pop.pretties();
 	}
@@ -185,6 +197,34 @@ public:
 	~GA() {
 		delete[] couples;
 		delete[] fitness;
+	}
+
+	GA(const GA& ga):
+		phenotype(ga.phenotype),
+		pop(ga.pop),
+		fitness(new pair<int, double>[ga.pop.pop_size]),
+		numcouples(ga.numcouples),
+		couples(new triple[ga.numcouples])
+	{
+		//memcpy(fitness, ga.fitness, ga.pop.pop_size * sizeof(pair<int, double>) );
+		//memcpy(couples, ga.couples, ga.numcouples * sizeof(triple) );
+		cout << "GA: Deep Copy!" << endl;
+	}
+
+	GA& operator=(GA other)
+	{
+		//if other is a constructed entity then okay to swap
+		cout << "GA: Copy Assignment Operator!" << endl;
+		swap(*this, other);
+		return *this;
+	}
+
+	void swap(GA& ga1, GA& ga2) {
+		std::swap(ga1.phenotype, ga2.phenotype);
+		std::swap(ga1.pop, ga2.pop);
+		std::swap(ga1.fitness, ga2.fitness);
+		std::swap(ga1.numcouples, ga2.numcouples);
+		std::swap(ga1.couples, ga2.couples);
 	}
 
 	//funcs control underlying population parameters
@@ -200,12 +240,24 @@ public:
 	triple evolve() {
 		double pop_min_f = 0;   //sum, min
 		double f_unit = 0;      //converts fitness abv min -> children
+#ifdef VERBOSE
+		cout << "Fitness.";
+#endif // VERBOSE
 		bool not_same = calcFitness(pop_min_f, f_unit);		//TODO: ignoring all same
+#ifdef VERBOSE
+		cout << "Sort.";
+#endif // VERBOSE
 		sortFitness();
+#ifdef VERBOSE
+		cout << "Marry.";
+#endif // VERBOSE
 		marry();
 		pop.gen++;
+#ifdef VERBOSE
+		cout << "Breed.";
+#endif // VERBOSE
 		breed(pop_min_f, f_unit, not_same);		
-		return couples[0];
+		return couples[0];			//returns fitness of top parents
 		//Swapped at end of breed... move into evolve?
 	}
 

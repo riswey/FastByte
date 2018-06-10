@@ -73,13 +73,13 @@
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <LinkIncremental>true</LinkIncremental>
     <IncludePath>C:\Users\Alva\source\repos\MyFileFuncs\MyFileFuncs;C:\Users\Alva\source\repos\Libs\msvc2017_64\include;$(IncludePath)</IncludePath>
-    <LibraryPath>C:\Users\Alva\source\repos\MyFileFuncs\Debug;C:\Users\Alva\source\repos\Libs\msvc2017_64\lib\gsl;$(LibraryPath)</LibraryPath>
+    <LibraryPath>C:\Users\Alva\source\repos\MyFileFuncs\Debug;C:\Users\Alva\source\repos\Libs\msvc2017_64\lib\gsl\x86;$(LibraryPath)</LibraryPath>
     <ReferencePath>$(ReferencePath)</ReferencePath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <LinkIncremental>true</LinkIncremental>
     <IncludePath>C:\Users\Alva\source\repos\Libs\msvc2017_64\include;C:\Users\Alva\source\repos\MyFileFuncs\MyFileFuncs;$(IncludePath)</IncludePath>
-    <LibraryPath>C:\Users\Alva\source\repos\Libs\msvc2017_64\lib\gsl;C:\Users\Alva\source\repos\MyFileFuncs\x64\Debug;$(LibraryPath)</LibraryPath>
+    <LibraryPath>C:\Users\Alva\source\repos\Libs\msvc2017_64\lib\gsl\x86;C:\Users\Alva\source\repos\MyFileFuncs\x64\Debug;$(LibraryPath)</LibraryPath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
     <LinkIncremental>false</LinkIncremental>
@@ -103,7 +103,7 @@
     <Link>
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalDependencies>MyFileFuncs.lib;gsl.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>MyFileFuncs.lib;mpfr32.lib;mpir32.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
@@ -118,7 +118,7 @@
     <Link>
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalDependencies>gsl.lib;cblas.lib;MyFileFuncs.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>mpfr64.lib;mpir64.lib;MyFileFuncs.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">

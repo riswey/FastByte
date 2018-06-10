@@ -7,8 +7,8 @@
 template<typename T> class TestPhenotype: public Phenotype<T> {
 public:
 	using Phenotype::Phenotype;
-	double calc(GenePop<T>& const pop, const int ind) {
-		double val = (double)pop.get(ind, 0);
+	double calc(GenePop<T> const *pop, const int ind) {
+		double val = (double)pop->get(ind, 0);
 
 		return 96.6 - pow(val / 10 - 24.5, 2);
 	}

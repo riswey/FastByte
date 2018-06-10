@@ -166,7 +166,7 @@ template<typename T> class GenePop {
 	}
 
 	//gets the index of the gene in the memory
-	inline int gene_pos(int ind, int gene) {
+	inline int gene_pos(int ind, int gene) const {
 		return gene_count * ind + gene;
 	}
 
@@ -213,7 +213,7 @@ public:
 		delete[] mask;
 		cout << "Memory freed." << endl;
 	}
-
+	/*
 	GenePop(const GenePop& pop):
 		prob_cross(pop.prob_cross),
 		prob_mut(pop.prob_mut),
@@ -254,7 +254,7 @@ public:
 		std::swap(gp1.units2, gp2.units2);
 		//rest are same!
 	}
-
+	*/
 	//Set the population parameters
 	void setProbCO(double _prob_cross) { prob_cross = _prob_cross; cout << "Prob cross: " << prob_cross << endl; }
 	void setProbMut(double _prob_mut) { prob_mut = _prob_mut; cout << "Prob mut: " << prob_mut << endl; }
@@ -271,7 +271,7 @@ public:
 	}
 
 	//Return a gene
-	T get(const int ind, const int gene) {
+	T get(const int ind, const int gene) const {
 		int offset = gene_pos(ind, gene);
 		return static_cast<T>(units[offset]);
 	}

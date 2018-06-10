@@ -8,14 +8,13 @@
 
 #define _GA_VERSION_ "2.1.2013.6.19.13.00"
 
-//#define VERBOSE
+#define VERBOSE
 
 #include "GenePop.h"
 #include "Phenotype.h"
 #include <algorithm>//sort
 #include <vector>//moving individuals about
 #include "ctpl_stl.h"
-#include <mutex>		//consider critical section = faster
 #include "windows.h"	//for HANDLE
 #include <process.h>	//for event
 
@@ -58,7 +57,6 @@ using namespace std;
 //Multithreading
 int NUMBER_PROCESSORS = 4;
 ctpl::thread_pool p(NUMBER_PROCESSORS);
-std::mutex mtx;
 static std::atomic<int> threadReturnCount = 0;		//try semaphore
 static int processTarget = 0;
 HANDLE myEvent = CreateEvent(0, 0, 0, 0);		//win32 API
@@ -78,33 +76,15 @@ struct triple {
 
 
 //Must be pointers as copied by value across (References do not work in threads)
-template<typename T, typename U> void threadSafeFitness(int id, GenePop<T>* pop, U* phenotype, pair<int, double>* fitness, int i, double* sum, double* mn, double* pop_min_f) {
-	
+template<typename T, typename U> void threadSafeFitness(int id, GenePop<T> const *pop, U * phenotype, pair<int, double>* fitness, int i) {
 	////////////////////////////////////////////////////////
 	// fitness run here
-	double f = phenotype->calc(*pop, i);
-	//
-	////////////////////////////////////////////////////////
-
-	//Important to lock these are not atomic variables)
-	mtx.lock();
-
-	fitness[i].first = i;   //id pop posn
-	fitness[i].second = f;
-	//calc pop fitness params
-	*sum += f;                   //sum
-	if (f < *mn)                 //min
-	{
-		*mn = f;
-		*pop_min_f = f;
-	}
-	mtx.unlock();
+	fitness[i].second = phenotype->calc(pop, i);
 
 	//Is it the last thread to return -> call
 	//atomic so ok
-	++threadReturnCount;
 
-	if (threadReturnCount == processTarget) {
+	if (++threadReturnCount == processTarget) {
 		threadReturnCount = 0;
 		SetEvent(myEvent);
 	}
@@ -123,6 +103,11 @@ class GA {
 	triple* couples;            //marriage lists
 
 	void init() {//init rest of variables
+		if (floor(pop.pop_size / 2) != pop.pop_size / 2) {
+			cout << "Error: must be even pop size!" << endl;
+			getchar(); exit(1);
+		}
+
 		double memMB = (pop.pop_size / 2 + 28 * pop.pop_size) / 1048576;
 
 		cout << "************************************************" << endl;
@@ -134,38 +119,64 @@ class GA {
 		cout << "Memory footprint: " << to_string(memMB) << "MB" << endl;
 
 		fitness = new pair<int, double>[pop.pop_size];
-		numcouples = static_cast<const int> (ceil(pop.pop_size / 2));
+		numcouples = static_cast<const int> (pop.pop_size / 2);
 		couples = new triple[numcouples];
 	}
 
-	bool calcFitness(double& pop_min_f, double& f_unit) {	//
-		//returns false if all same
-		double sum = 0;
-		double mn = MAX_double;
-		double popsize = static_cast<double>(pop.pop_size);
+	void calcFitness() {	//
 
 		//Use Semaphore?
 		processTarget = pop.pop_size;
 
-		for (int i = 0; i < pop.pop_size; i++)
+		for (int i = 0; i < processTarget; i++)
 		{
 			//pop in on stack so send point, next 2 are pointers already.
-			p.push(threadSafeFitness<T, U>, &pop, phenotype, fitness, i, &sum, &mn, &pop_min_f);
+			fitness[i].first = i;   //id pop posn so can sort
+			p.push(threadSafeFitness<T, U>, &pop, phenotype, fitness, i);
 		}
 
 		//hopefully main thread waits until event set
 		
 		WaitForSingleObject(myEvent, INFINITE);
 
+	}
+
+	bool calcMetrics(double& pop_min_f, double& f_unit) {
+		/*
+			pop_min_f = bottom fitness
+
+			Total amount of fitness = sum - popsize * pop_min_f
+
+			your_fitness * pop/total_fitness = your percentage of pop
+		
+		*/
+
+		//returns false if all same
+		pop_min_f = MAX_double;				//bottom fitness
+		double sum = 0;
+		double popsize = static_cast<double>(pop.pop_size);
+		double f;
+
+		for (int i = 0; i < popsize;i++) {
+			//calc pop fitness params
+			f = fitness[i].second;
+			sum += f;							//sum
+			if (f < pop_min_f)					//min
+			{
+				pop_min_f = f;
+			}
+		}
+
 		//this is num children you get per couples fitness above min
 		//can be near zero so handle!
-		double denom = (sum - popsize * pop_min_f);
+		double total_pop_fitness_above_min = (sum - popsize * pop_min_f);
 
-		if (denom < MIN_SUM_ABV_MIN) return false;
+		if (total_pop_fitness_above_min < MIN_SUM_ABV_MIN) return false;
 
-		f_unit = popsize / denom;
+		f_unit = popsize / total_pop_fitness_above_min;
 
 		return true;
+
 	}
 
 	void sortFitness() {
@@ -184,32 +195,44 @@ class GA {
 		}
 	}
 
-	void breed(double pop_min_f, double f_unit, bool not_same) {
+	void doCrossOvers() {
 		//Get positions of all cross overs
 		pop.populateCrossOverMap();
+	}
 
-		int child_count = 0;        //Num children so far
-		double total_children = 0;  //Total children to aim for
-		int num_children = 0;       //rounded Total children (don't round before else rounding artefacts)
-		for (int i = 0; i < numcouples; i++) {
-			int parent1 = couples[i].first;
-			int parent2 = couples[i].second;
-			double sum_fitness = couples[i].third;
-			double couple_f_abv_min = sum_fitness - 2 * pop_min_f;
-			//fitnesses too similar
-			if (not_same)
+	void breed(double pop_min_f, double f_unit, bool not_same) {
+		int child_count = 0;        //Num children so far (0 indexed)
+		
+		if (not_same) {
+			double total_children = -1;		//Total children couple allowed to aim for (double)
+											//Must accumulate 1 before 1st child license released!
+			for (int i = 0; i < numcouples; i++) {
+				int parent1 = couples[i].first;
+				int parent2 = couples[i].second;
+				double sum_fitness = couples[i].third;
+				double couple_f_abv_min = sum_fitness - 2 * pop_min_f;		//couple f above min
 				total_children += couple_f_abv_min * f_unit;
-			else
-				total_children += 2.0;
-			/*
-			add before rounding to avoid rounding artifacts
-			instead of looping num_children which would amplify the error.
-			*/
-			num_children = floor(total_children);   //total_children -> popsize
-			while (child_count < (const int)num_children)
-			{
-				pop.child(child_count++, parent1, parent2);
+
+				while (child_count < total_children)
+				{
+					pop.child(child_count++, parent1, parent2);
+				}
 			}
+		}
+		else {
+#ifdef VERBOSE
+	cout << "(Fitness Similar)" << endl;
+#endif
+			//fitnesses too similar
+			for (int i = 0; i < numcouples; i++) {
+				int parent1 = couples[i].first;
+				int parent2 = couples[i].second;
+				//Everyone similar fitness so just give 2 children each
+				for (int j = 0; j < 2; j++) {
+					pop.child(child_count++, parent1, parent2);
+				}
+			}
+
 		}
 		//Children made, swap populations around
 		pop.swapPopulations();
@@ -247,7 +270,7 @@ public:
 		delete[] couples;
 		delete[] fitness;
 	}
-
+	/*
 	GA(const GA& ga):
 		phenotype(ga.phenotype),
 		pop(ga.pop),
@@ -275,6 +298,7 @@ public:
 		std::swap(ga1.numcouples, ga2.numcouples);
 		std::swap(ga1.couples, ga2.couples);
 	}
+	*/
 
 	//funcs control underlying population parameters
 	void setProbCO(double _prob_cross) { pop.setProbCO(_prob_cross); }
@@ -287,31 +311,38 @@ public:
 	}
 
 	triple evolve() {
-		double pop_min_f = 0;   //sum, min
-		double f_unit = 0;      //converts fitness abv min -> children
+		double pop_min_f = 0;   //bottom fitness(f)
+		double f_unit = 0;      //popsize / total_fitness
+								//your_fitness * f_unit -> share of next population
 #ifdef VERBOSE
-		cout << "Fitness.";
+		cout << "Fitness..";
 #endif // VERBOSE
-		bool not_same = calcFitness(pop_min_f, f_unit);		//TODO: ignoring all same
+		calcFitness();		//TODO: ignoring all same
 #ifdef VERBOSE
-		cout << "Sort.";
+		cout << "Metrics..";
+#endif // VERBOSE
+		//can't be parallel cos no math for atomic<double>, and mutex is blocking
+		bool not_same = calcMetrics(pop_min_f, f_unit);
+#ifdef VERBOSE
+		cout << "Sort..";
 #endif // VERBOSE
 		sortFitness();
 #ifdef VERBOSE
-		cout << "Marry.";
+		cout << "Marry..";
 #endif // VERBOSE
 		marry();
 		pop.gen++;
 #ifdef VERBOSE
-		cout << "Breed.";
+		cout << "Breed..";
 #endif // VERBOSE
+		doCrossOvers();
 		breed(pop_min_f, f_unit, not_same);
 		return couples[0];			//returns fitness of top parents
 									//Swapped at end of breed... move into evolve?
 	}
 
 	double calc(int ind) { 
-		return phenotype->calc(pop, ind);
+		return phenotype->calc(&pop, ind);
 	}
 
 	//TODO: check Casting big to avoid using T

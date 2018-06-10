@@ -46,7 +46,7 @@ namespace GenePopTest
 
 		}
 
-		TEST_METHOD(TestBreeding)
+		TEST_METHOD(TestCrossovers)
 		{
 			//10 individuals with 2x 8bit genes
 			GenePop<uint8_t> pop(10, 2, 8);
@@ -72,10 +72,38 @@ namespace GenePopTest
 
 		}
 
-		TEST_METHOD(GA)
+		TEST_METHOD(TestBreeding)
 		{
-		}
+			int child_count = 0;        //Num children so far
 
+			double size = 11;
+
+			double fitness[11] = { 0.781007, 0.987095, 0.816114, 0.333005, 0.838099, 0.319576, 0.476979,
+				0.384771, 0.425035, 0.263178, 0.530664 };
+
+			double pop_min_f = 0.263178;
+			double sum = 6.15552 - size * pop_min_f;
+			double f_unit = size / sum;
+
+			double total_children = -1;		//Total children couple allowed to aim for (double)
+											//must get to 0 before get first child!
+			for (int i = 0; i < size; i++) {
+				double couple_f_abv_min = fitness[i] - pop_min_f;		//couple f above min
+				total_children += couple_f_abv_min * f_unit;
+
+				Logger::WriteMessage(std::to_string(total_children).c_str());
+
+				while (child_count <= total_children)
+				{
+					Logger::WriteMessage(std::to_string(child_count).c_str());
+
+					child_count++;
+				}
+			}
+
+			a.IsTrue(child_count == size);
+			
+		}
 
 	};
 }

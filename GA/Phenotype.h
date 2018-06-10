@@ -20,7 +20,7 @@ public:
 		init(genecount);
 	}
 
-	virtual double calc(const GenePop<T>& pop, const int ind) {
+	virtual double calc(GenePop<T> const * pop, const int ind) const {
 		return 1;
 	}
 

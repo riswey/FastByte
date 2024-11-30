@@ -8,7 +8,7 @@
 
 #define _GA_VERSION_ "2.1.2013.6.19.13.00"
 
-#define VERBOSE
+//#define VERBOSE
 
 #include "GenePop.h"
 #include "Phenotype.h"

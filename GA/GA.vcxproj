@@ -89,8 +89,8 @@
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <LinkIncremental>false</LinkIncremental>
-    <IncludePath>C:\Users\Alva\source\repos\Libs\msvc2017_64\include;C:\Users\Alva\source\repos\MyFileFuncs\MyFileFuncs;$(IncludePath)</IncludePath>
-    <LibraryPath>C:\Users\Alva\source\repos\Libs\msvc2017_64\lib\gsl;C:\Users\Alva\source\repos\MyFileFuncs\x64\Release;$(LibraryPath)</LibraryPath>
+    <IncludePath>C:\Users\riswe\source\repos\MOI\Libs\msvc2017_64\include;C:\Users\riswe\source\repos\MOI\MyFileFuncs\MyFileFuncs;$(IncludePath)</IncludePath>
+    <LibraryPath>C:\Users\riswe\source\repos\MOI\Libs\msvc2017_64\lib\gsl;C:\Users\riswe\source\repos\MOI\MyFileFuncs\x64\Release;$(LibraryPath)</LibraryPath>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <ClCompile>

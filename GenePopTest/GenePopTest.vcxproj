@@ -77,8 +77,8 @@
   <PropertyGroup Label="UserMacros" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <LinkIncremental>false</LinkIncremental>
-    <IncludePath>C:\Users\Alva\source\repos\MyFileFuncs\MyFileFuncs;C:\Users\Alva\source\repos\Libs\msvc2017_64\include;$(IncludePath)</IncludePath>
-    <LibraryPath>C:\Users\Alva\source\repos\Libs\msvc2017_64\lib\gsl;$(LibraryPath)</LibraryPath>
+    <IncludePath>C:\Users\riswe\source\repos\MOI\MyFileFuncs\MyFileFuncs;C:\Users\riswe\source\repos\MOI\Libs\msvc2017_64\include;$(IncludePath)</IncludePath>
+    <LibraryPath>C:\Users\riswe\source\repos\MOI\Libs\msvc2017_64\lib\gsl;$(LibraryPath)</LibraryPath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <LinkIncremental>true</LinkIncremental>
@@ -170,7 +170,17 @@
       <Project>{c23ed50e-20a1-4531-aab0-18d64c8d7c5b}</Project>
     </ProjectReference>
   </ItemGroup>
+  <ItemGroup>
+    <None Include="packages.config" />
+  </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
+    <Import Project="..\packages\Microsoft-CppUnitTestFramework.15.0.0\build\native\Microsoft-CppUnitTestFramework.targets" Condition="Exists('..\packages\Microsoft-CppUnitTestFramework.15.0.0\build\native\Microsoft-CppUnitTestFramework.targets')" />
   </ImportGroup>
+  <Target Name="EnsureNuGetPackageBuildImports" BeforeTargets="PrepareForBuild">
+    <PropertyGroup>
+      <ErrorText>This project references NuGet package(s) that are missing on this computer. Use NuGet Package Restore to download them.  For more information, see http://go.microsoft.com/fwlink/?LinkID=322105. The missing file is {0}.</ErrorText>
+    </PropertyGroup>
+    <Error Condition="!Exists('..\packages\Microsoft-CppUnitTestFramework.15.0.0\build\native\Microsoft-CppUnitTestFramework.targets')" Text="$([System.String]::Format('$(ErrorText)', '..\packages\Microsoft-CppUnitTestFramework.15.0.0\build\native\Microsoft-CppUnitTestFramework.targets'))" />
+  </Target>
 </Project>
